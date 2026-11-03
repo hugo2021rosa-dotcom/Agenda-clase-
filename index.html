@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda de clase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e9eef2;--card:#fff;--ink:#14213d;--mute:#5b6b7f;--line:#cdd7e0;--exam:#d1495b;--work:#1b8a8f;--btn:#14213d}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1722;--card:#18232f;--ink:#e8eef4;--mute:#92a3b6;--line:#2a3a4a;--exam:#f0707f;--work:#4cc3c8;--btn:#e8eef4}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Bricolage Grotesque',system-ui,sans-serif;line-height:1.4}
+main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:2rem;font-weight:800;margin:8px 0 16px;letter-spacing:-.02em}
+nav{display:flex;gap:8px;margin-bottom:16px}
+nav button{flex:1;padding:10px;border:2px solid var(--ink);background:transparent;color:var(--ink);font:600 1rem inherit;font-family:inherit;border-radius:10px;cursor:pointer}
+nav button[aria-selected=true]{background:var(--btn);color:var(--bg)}
+input,select,button{font-family:inherit;font-size:1rem}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.search{margin-bottom:12px}
+form{display:grid;gap:8px;background:var(--card);padding:14px;border-radius:12px;border:1px solid var(--line);margin-bottom:18px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.primary{padding:11px;border:0;border-radius:8px;background:var(--btn);color:var(--bg);font-weight:600;cursor:pointer}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+li{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--exam);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center}
+li.trabajo{border-left-color:var(--work)}
+li.pasado{opacity:.5}
+.info{flex:1;min-width:0}
+.t{font-weight:600;overflow-wrap:anywhere}
+.m{color:var(--mute);font-size:.9rem}
+.tag{font-weight:600}
+.exam .tag,li:not(.trabajo) .tag{color:var(--exam)}
+li.trabajo .tag{color:var(--work)}
+a{color:var(--work)}
+.acts{display:flex;gap:6px}
+.acts button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer}
+.vacio,.aviso{color:var(--mute);text-align:center;padding:20px}
+.aviso{background:var(--card);border:1px dashed var(--exam);border-radius:10px}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:min(92vw,420px)}
+dialog form{border:0;padding:0;margin:0}
+:focus-visible{outline:3px solid var(--work);outline-offset:2px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>Agenda de clase</h1>
+  <div id="aviso" class="aviso" hidden>Falta configurar Firebase. Edita <b>firebase-config.js</b> (mira el README).</div>
+  <nav role="tablist">
+    <button role="tab" aria-selected="true" data-tab="fechas">Exámenes y trabajos</button>
+    <button role="tab" aria-selected="false" data-tab="libros">Libros</button>
+  </nav>
+
+  <section id="fechas">
+    <input class="search" id="q-fechas" type="search" placeholder="Buscar materia…">
+    <form id="f-fechas">
+      <input name="titulo" placeholder="Título de la materia" required>
+      <div class="row">
+        <select name="tipo"><option value="examen">Examen</option><option value="trabajo">Trabajo</option></select>
+        <input name="fecha" type="date" required>
+      </div>
+      <button class="primary">Añadir</button>
+    </form>
+    <ul id="l-fechas"></ul>
+  </section>
+
+  <section id="libros" hidden>
+    <input class="search" id="q-libros" type="search" placeholder="Buscar libro…">
+    <form id="f-libros">
+      <input name="titulo" placeholder="Título del libro" required>
+      <input name="url" type="url" placeholder="Enlace al libro digital (https://…)" required>
+      <button class="primary">Añadir libro</button>
+    </form>
+    <ul id="l-libros"></ul>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form id="f-edit" method="dialog">
+    <input name="titulo" required>
+    <select name="tipo"><option value="examen">Examen</option><option value="trabajo">Trabajo</option></select>
+    <input name="fecha" type="date">
+    <input name="url" type="url">
+    <div class="row"><button class="primary" value="ok">Guardar</button><button class="primary" value="cancel" formnovalidate>Cancelar</button></div>
+  </form>
+</dialog>
+
+<script type="module">
+import { firebaseConfig } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+if (firebaseConfig.apiKey === "PEGA_AQUI") { $("#aviso").hidden = false; throw new Error("Firebase sin configurar"); }
+
+const db = getFirestore(initializeApp(firebaseConfig));
+const data = { fechas: [], libros: [] };
+
+// Pestañas
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b));
+  $("#fechas").hidden = b.dataset.tab !== "fechas";
+  $("#libros").hidden = b.dataset.tab !== "libros";
+});
+
+// Sincronización en tiempo real
+for (const col of ["fechas", "libros"]) {
+  onSnapshot(collection(db, col), snap => {
+    data[col] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    render(col);
+  });
+  $("#q-" + col).oninput = () => render(col);
+  $("#f-" + col).onsubmit = async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    await addDoc(collection(db, col), { ...f, creado: serverTimestamp() });
+    e.target.reset();
+  };
+}
+
+function render(col) {
+  const q = $("#q-" + col).value.trim().toLowerCase();
+  let items = data[col].filter(i => i.titulo.toLowerCase().includes(q));
+  if (col === "fechas") items.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  else items.sort((a, b) => a.titulo.localeCompare(b.titulo, "es"));
+  const hoy = new Date().toISOString().slice(0, 10);
+  $("#l-" + col).innerHTML = items.length ? items.map(i => col === "fechas" ? fila(i, hoy) : libro(i)).join("")
+    : `<li class="vacio" style="display:block;border-left-width:1px">${q ? "Sin resultados" : "Aún no hay nada. Añade el primero."}</li>`;
+}
+
+function fila(i, hoy) {
+  const d = Math.round((new Date(i.fecha) - new Date(hoy)) / 864e5);
+  const cuando = d < 0 ? "pasado" : d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
+  const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  return `<li class="${i.tipo} ${d < 0 ? "pasado" : ""}"><div class="info"><div class="t">${esc(i.titulo)}</div>
+    <div class="m"><span class="tag">${i.tipo === "examen" ? "Examen" : "Trabajo"}</span> · ${fecha} · ${cuando}</div></div>${acciones("fechas", i.id)}</li>`;
+}
+
+function libro(i) {
+  return `<li class="trabajo"><div class="info"><div class="t">${esc(i.titulo)}</div>
+    <div class="m"><a href="${esc(i.url)}" target="_blank" rel="noopener">Abrir libro</a></div></div>${acciones("libros", i.id)}</li>`;
+}
+
+const acciones = (col, id) => `<div class="acts"><button data-a="edit" data-c="${col}" data-id="${id}">Editar</button><button data-a="del" data-c="${col}" data-id="${id}">Eliminar</button></div>`;
+
+// Editar / eliminar
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-a]"); if (!b) return;
+  const { a, c, id } = b.dataset;
+  const item = data[c].find(x => x.id === id);
+  if (a === "del") {
+    if (confirm(`¿Eliminar "${item.titulo}"?`)) await deleteDoc(doc(db, c, id));
+    return;
+  }
+  const f = $("#f-edit");
+  f.titulo.value = item.titulo;
+  const esFecha = c === "fechas";
+  f.tipo.hidden = f.fecha.hidden = !esFecha; f.url.hidden = esFecha;
+  f.fecha.required = esFecha; f.url.required = !esFecha;
+  if (esFecha) { f.tipo.value = item.tipo; f.fecha.value = item.fecha; } else f.url.value = item.url;
+  $("#dlg").returnValue = "";
+  $("#dlg").showModal();
+  $("#dlg").onclose = async () => {
+    if ($("#dlg").returnValue !== "ok") return;
+    const n = { titulo: f.titulo.value };
+    if (esFecha) { n.tipo = f.tipo.value; n.fecha = f.fecha.value; } else n.url = f.url.value;
+    await updateDoc(doc(db, c, id), n);
+  };
+});
+</script>
+</body>
+</html>

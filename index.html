@@ -94,7 +94,7 @@ h2.dia.hoy{color:var(--work)}
         <input name="ejercicios" placeholder="Ejercicios (ej. 1, 2, 5)" required>
         <input name="pagina" placeholder="Página" required>
       </div>
-      <label class="m">Fecha de entrega</label>
+      <label class="m">Fecha en que se mandó</label>
       <input name="fecha" type="date" required>
       <button class="primary">Añadir deberes</button>
     </form>
@@ -165,7 +165,8 @@ for (const col of ["fechas", "deberes", "libros"]) {
 function render(col) {
   const q = $("#q-" + col).value.trim().toLowerCase();
   let items = data[col].filter(i => nombre(col, i).toLowerCase().includes(q));
-  if (col === "fechas" || col === "deberes") items.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (col === "fechas") items.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  else if (col === "deberes") items.sort((a, b) => b.fecha.localeCompare(a.fecha));
   else items.sort((a, b) => a.titulo.localeCompare(b.titulo, "es"));
   const hoy = new Date().toISOString().slice(0, 10);
   $("#l-" + col).innerHTML = items.length ? items.map(i => col === "fechas" ? fila(i, hoy) : col === "deberes" ? deber(i, hoy) : libro(i)).join("")
@@ -183,12 +184,12 @@ function fila(i, hoy) {
 const nombre = (col, i) => col === "deberes" ? `${i.asignatura} ${i.tema}` : i.titulo;
 
 function deber(i, hoy) {
-  const d = Math.round((new Date(i.fecha) - new Date(hoy)) / 864e5);
-  const cuando = d < 0 ? "pasado" : d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
+  const d = Math.round((new Date(hoy) - new Date(i.fecha)) / 864e5);
+  const cuando = d <= 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`;
   const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" });
-  return `<li class="trabajo ${d < 0 ? "pasado" : ""}"><div class="info"><div class="t">${esc(i.asignatura)} · ${esc(i.tema)}</div>
+  return `<li class="trabajo"><div class="info"><div class="t">${esc(i.asignatura)} · ${esc(i.tema)}</div>
     <div class="m">Ejercicios: ${esc(i.ejercicios)} · Pág. ${esc(i.pagina)}</div>
-    <div class="m"><span class="tag">Entrega</span> · ${fecha} · ${cuando}</div></div>${acciones("deberes", i.id)}</li>`;
+    <div class="m"><span class="tag">Mandado</span> · ${fecha} · ${cuando}</div></div>${acciones("deberes", i.id)}</li>`;
 }
 
 function libro(i) {

@@ -17,7 +17,7 @@
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Bricolage Grotesque',system-ui,sans-serif;line-height:1.4}
 main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
 h1{font-size:2rem;font-weight:800;margin:8px 0 16px;letter-spacing:-.02em}
-nav{display:flex;gap:8px;margin-bottom:16px}
+nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
 nav button{flex:1;padding:10px 4px!important;font-size:.9rem!important;padding:10px;border:2px solid var(--ink);background:transparent;color:var(--ink);font:600 1rem inherit;font-family:inherit;border-radius:10px;cursor:pointer}
 nav button[aria-selected=true]{background:var(--btn);color:var(--bg)}
 input,select,button{font-family:inherit;font-size:1rem}
@@ -62,6 +62,7 @@ h2.dia.hoy{color:var(--work)}
   <nav role="tablist">
     <button role="tab" aria-selected="true" data-tab="fechas">Exámenes y trabajos</button>
     <button role="tab" aria-selected="false" data-tab="horario">Horario</button>
+    <button role="tab" aria-selected="false" data-tab="deberes">Deberes</button>
     <button role="tab" aria-selected="false" data-tab="libros">Libros</button>
   </nav>
 
@@ -84,6 +85,22 @@ h2.dia.hoy{color:var(--work)}
     <div id="l-horario"></div>
   </section>
 
+  <section id="deberes" hidden>
+    <input class="search" id="q-deberes" type="search" placeholder="Buscar asignatura o tema…">
+    <form id="f-deberes">
+      <select name="asignatura" required><option>CEAC</option><option>OACV</option><option>ING</option><option>EYA</option><option>TII</option><option>TC</option><option>IPE I GM</option><option>SASPM</option><option>DASPGM</option></select>
+      <input name="tema" placeholder="Tema" required>
+      <div class="row">
+        <input name="ejercicios" placeholder="Ejercicios (ej. 1, 2, 5)" required>
+        <input name="pagina" placeholder="Página" required>
+      </div>
+      <label class="m">Fecha de entrega</label>
+      <input name="fecha" type="date" required>
+      <button class="primary">Añadir deberes</button>
+    </form>
+    <ul id="l-deberes"></ul>
+  </section>
+
   <section id="libros" hidden>
     <input class="search" id="q-libros" type="search" placeholder="Buscar libro…">
     <form id="f-libros">
@@ -100,6 +117,10 @@ h2.dia.hoy{color:var(--work)}
     <input name="titulo" required>
     <select name="tipo"><option value="examen">Examen</option><option value="trabajo">Trabajo</option></select>
     <input name="fecha" type="date">
+    <select name="asignatura"><option>CEAC</option><option>OACV</option><option>ING</option><option>EYA</option><option>TII</option><option>TC</option><option>IPE I GM</option><option>SASPM</option><option>DASPGM</option></select>
+    <input name="tema" placeholder="Tema">
+    <input name="ejercicios" placeholder="Ejercicios">
+    <input name="pagina" placeholder="Página">
     <input name="url" type="url">
     <div class="row"><button class="primary" value="ok">Guardar</button><button class="primary" value="cancel" formnovalidate>Cancelar</button></div>
   </form>
@@ -123,11 +144,11 @@ const data = { fechas: [], libros: [] };
 // Pestañas
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b));
-  for (const t of ["fechas", "horario", "libros"]) $("#" + t).hidden = b.dataset.tab !== t;
+  for (const t of ["fechas", "horario", "deberes", "libros"]) $("#" + t).hidden = b.dataset.tab !== t;
 });
 
 // Sincronización en tiempo real
-for (const col of ["fechas", "libros"]) {
+for (const col of ["fechas", "deberes", "libros"]) {
   onSnapshot(collection(db, col), snap => {
     data[col] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     render(col);
@@ -143,11 +164,11 @@ for (const col of ["fechas", "libros"]) {
 
 function render(col) {
   const q = $("#q-" + col).value.trim().toLowerCase();
-  let items = data[col].filter(i => i.titulo.toLowerCase().includes(q));
-  if (col === "fechas") items.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  let items = data[col].filter(i => nombre(col, i).toLowerCase().includes(q));
+  if (col === "fechas" || col === "deberes") items.sort((a, b) => a.fecha.localeCompare(b.fecha));
   else items.sort((a, b) => a.titulo.localeCompare(b.titulo, "es"));
   const hoy = new Date().toISOString().slice(0, 10);
-  $("#l-" + col).innerHTML = items.length ? items.map(i => col === "fechas" ? fila(i, hoy) : libro(i)).join("")
+  $("#l-" + col).innerHTML = items.length ? items.map(i => col === "fechas" ? fila(i, hoy) : col === "deberes" ? deber(i, hoy) : libro(i)).join("")
     : `<li class="vacio" style="display:block;border-left-width:1px">${q ? "Sin resultados" : "Aún no hay nada. Añade el primero."}</li>`;
 }
 
@@ -157,6 +178,17 @@ function fila(i, hoy) {
   const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
   return `<li class="${i.tipo} ${d < 0 ? "pasado" : ""}"><div class="info"><div class="t">${esc(i.titulo)}</div>
     <div class="m"><span class="tag">${i.tipo === "examen" ? "Examen" : "Trabajo"}</span> · ${fecha} · ${cuando}</div></div>${acciones("fechas", i.id)}</li>`;
+}
+
+const nombre = (col, i) => col === "deberes" ? `${i.asignatura} ${i.tema}` : i.titulo;
+
+function deber(i, hoy) {
+  const d = Math.round((new Date(i.fecha) - new Date(hoy)) / 864e5);
+  const cuando = d < 0 ? "pasado" : d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
+  const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" });
+  return `<li class="trabajo ${d < 0 ? "pasado" : ""}"><div class="info"><div class="t">${esc(i.asignatura)} · ${esc(i.tema)}</div>
+    <div class="m">Ejercicios: ${esc(i.ejercicios)} · Pág. ${esc(i.pagina)}</div>
+    <div class="m"><span class="tag">Entrega</span> · ${fecha} · ${cuando}</div></div>${acciones("deberes", i.id)}</li>`;
 }
 
 function libro(i) {
@@ -228,25 +260,35 @@ document.addEventListener("click", async e => {
   const { a, c, id } = b.dataset;
   const item = data[c].find(x => x.id === id);
   if (a === "del") {
-    if (confirm(`¿Eliminar "${item.titulo}"?`)) await deleteDoc(doc(db, c, id));
+    if (confirm(`¿Eliminar "${nombre(c, item)}"?`)) await deleteDoc(doc(db, c, id));
     return;
   }
   const f = $("#f-edit");
-  f.titulo.value = item.titulo;
-  const esFecha = c === "fechas";
-  f.tipo.hidden = f.fecha.hidden = !esFecha; f.url.hidden = esFecha;
-  f.fecha.required = esFecha; f.url.required = !esFecha;
-  if (esFecha) { f.tipo.value = item.tipo; f.fecha.value = item.fecha; } else f.url.value = item.url;
+  const esDeb = c === "deberes", esFecha = c === "fechas", esLib = c === "libros";
+  f.titulo.hidden = esDeb; f.titulo.required = !esDeb;
+  f.tipo.hidden = !esFecha;
+  f.fecha.hidden = esLib; f.fecha.required = !esLib;
+  f.url.hidden = !esLib; f.url.required = esLib;
+  f.asignatura.hidden = f.tema.hidden = f.ejercicios.hidden = f.pagina.hidden = !esDeb;
+  f.tema.required = f.ejercicios.required = f.pagina.required = esDeb;
+  if (esDeb) {
+    f.asignatura.value = item.asignatura; f.tema.value = item.tema;
+    f.ejercicios.value = item.ejercicios; f.pagina.value = item.pagina; f.fecha.value = item.fecha;
+  } else {
+    f.titulo.value = item.titulo;
+    if (esFecha) { f.tipo.value = item.tipo; f.fecha.value = item.fecha; } else f.url.value = item.url;
+  }
   $("#dlg").returnValue = "";
   $("#dlg").showModal();
   $("#dlg").onclose = async () => {
     if ($("#dlg").returnValue !== "ok") return;
-    const n = { titulo: f.titulo.value };
-    if (esFecha) { n.tipo = f.tipo.value; n.fecha = f.fecha.value; } else n.url = f.url.value;
+    let n;
+    if (esDeb) n = { asignatura: f.asignatura.value, tema: f.tema.value, ejercicios: f.ejercicios.value, pagina: f.pagina.value, fecha: f.fecha.value };
+    else if (esFecha) n = { titulo: f.titulo.value, tipo: f.tipo.value, fecha: f.fecha.value };
+    else n = { titulo: f.titulo.value, url: f.url.value };
     await updateDoc(doc(db, c, id), n);
   };
 });
 </script>
 </body>
-  </html>
-    
+</html>

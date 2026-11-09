@@ -20,16 +20,22 @@ h1{font-size:2rem;font-weight:800;margin:8px 0 16px;letter-spacing:-.02em}
 nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
 nav button{flex:1;padding:10px 4px!important;font-size:.9rem!important;padding:10px;border:2px solid var(--ink);background:transparent;color:var(--ink);font:600 1rem inherit;font-family:inherit;border-radius:10px;cursor:pointer}
 nav button[aria-selected=true]{background:var(--btn);color:var(--bg)}
+.sub{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.subtab{padding:9px 4px;border:2px solid var(--work);background:transparent;color:var(--work);font-family:inherit;font-size:.95rem;font-weight:600;border-radius:10px;cursor:pointer}
+.subtab[aria-selected=true]{background:var(--work);color:#fff}
 input,select,button{font-family:inherit;font-size:1rem}
 input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
 .search{margin-bottom:12px}
 form{display:grid;gap:8px;background:var(--card);padding:14px;border-radius:12px;border:1px solid var(--line);margin-bottom:18px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#filtros-hechos{margin-bottom:12px}
 .primary{padding:11px;border:0;border-radius:8px;background:var(--btn);color:var(--bg);font-weight:600;cursor:pointer}
 ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 li{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--exam);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center}
 li.trabajo{border-left-color:var(--work)}
 li.pasado{opacity:.5}
+li.semh{display:block;background:none;border:0;padding:6px 2px 0;font-weight:800;font-size:.95rem;color:var(--mute)}
+li.semex{background:var(--exam);color:#fff;border-radius:8px;padding:6px 10px}
 .info{flex:1;min-width:0}
 .t{font-weight:600;overflow-wrap:anywhere}
 .m{color:var(--mute);font-size:.9rem}
@@ -37,8 +43,9 @@ li.pasado{opacity:.5}
 .exam .tag,li:not(.trabajo) .tag{color:var(--exam)}
 li.trabajo .tag{color:var(--work)}
 a{color:var(--work)}
-.acts{display:flex;gap:6px}
-.acts button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer}
+.acts{display:flex;flex-direction:column;gap:6px}
+.acts button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.acts button.ok{background:var(--work);border-color:var(--work);color:#fff;font-weight:600}
 .vacio,.aviso{color:var(--mute);text-align:center;padding:20px}
 .aviso{background:var(--card);border:1px dashed var(--exam);border-radius:10px}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:min(92vw,420px)}
@@ -46,12 +53,14 @@ dialog form{border:0;padding:0;margin:0}
 :focus-visible{outline:3px solid var(--work);outline-offset:2px}
 h2.dia{font-size:1.05rem;margin:18px 0 8px}
 h2.dia.hoy{color:var(--work)}
+.badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:99px;background:var(--exam);color:#fff;font-size:.75rem;font-weight:600;vertical-align:middle}
 .hora{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;padding:12px 14px;margin-bottom:8px;border:0;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:1rem}
 .hora small{display:block;opacity:.9}
 .hora b{white-space:nowrap}
 .hora.e0{background:#2e9e5b}.hora.e1{background:#e08a1e}.hora.e2{background:#d1495b}
 .hora .est{font-size:.8rem;font-weight:600;white-space:nowrap}
 .leyenda{color:var(--mute);font-size:.9rem;margin:0 0 4px}
+#semana.conex{color:var(--exam);font-weight:600}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -69,11 +78,14 @@ h2.dia.hoy{color:var(--work)}
   <section id="fechas">
     <input class="search" id="q-fechas" type="search" placeholder="Buscar materia…">
     <form id="f-fechas">
-      <input name="titulo" placeholder="Título de la materia" required>
       <div class="row">
         <select name="tipo"><option value="examen">Examen</option><option value="trabajo">Trabajo</option></select>
-        <input name="fecha" type="date" required>
+        <select name="asignatura"></select>
       </div>
+      <input name="titulo" placeholder="Detalle (ej. Tema 3) — opcional">
+      <input name="fecha" type="date" required>
+      <select name="hora" hidden></select>
+      <div id="fh-nota" class="m" hidden></div>
       <button class="primary">Añadir</button>
     </form>
     <ul id="l-fechas"></ul>
@@ -86,7 +98,15 @@ h2.dia.hoy{color:var(--work)}
   </section>
 
   <section id="deberes" hidden>
+    <div class="sub">
+      <button class="subtab" data-sub="pend" aria-selected="true">Pendientes (<span id="n-pend">0</span>)</button>
+      <button class="subtab" data-sub="hech" aria-selected="false">Hechos (<span id="n-hech">0</span>)</button>
+    </div>
     <input class="search" id="q-deberes" type="search" placeholder="Buscar asignatura o tema…">
+    <div class="row" id="filtros-hechos" hidden>
+      <select id="fa-deberes"><option value="">Todas las asignaturas</option></select>
+      <select id="ord-deberes"><option value="pagina">Ordenar por página</option><option value="fecha">Ordenar por fecha</option></select>
+    </div>
     <form id="f-deberes">
       <select name="asignatura" required><option>CEAC</option><option>OACV</option><option>ING</option><option>EYA</option><option>TII</option><option>TC</option><option>IPE I GM</option><option>SASPM</option><option>DASPGM</option></select>
       <input name="tema" placeholder="Tema" required>
@@ -117,6 +137,7 @@ h2.dia.hoy{color:var(--work)}
     <input name="titulo" required>
     <select name="tipo"><option value="examen">Examen</option><option value="trabajo">Trabajo</option></select>
     <input name="fecha" type="date">
+    <select name="hora" hidden></select>
     <select name="asignatura"><option>CEAC</option><option>OACV</option><option>ING</option><option>EYA</option><option>TII</option><option>TC</option><option>IPE I GM</option><option>SASPM</option><option>DASPGM</option></select>
     <input name="tema" placeholder="Tema">
     <input name="ejercicios" placeholder="Ejercicios">
@@ -134,72 +155,22 @@ import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, on
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const $ = s => document.querySelector(s);
-const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 if (firebaseConfig.apiKey === "PEGA_AQUI") { $("#aviso").hidden = false; throw new Error("Firebase sin configurar"); }
 
 const db = getFirestore(initializeApp(firebaseConfig));
-const data = { fechas: [], libros: [] };
+const data = { fechas: [], deberes: [], libros: [] };
 
-// Pestañas
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b));
-  for (const t of ["fechas", "horario", "deberes", "libros"]) $("#" + t).hidden = b.dataset.tab !== t;
-});
+// ---- Utilidades de fechas ----
+const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const lunesDe = f => { const d = new Date(f + "T00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return ymd(d); };
+const lunesDeEstaSemana = () => lunesDe(ymd(new Date()));
+const diaIdx = f => (new Date(f + "T00:00").getDay() + 6) % 7; // 0 = lunes
+const diasHasta = (a, b) => Math.round((new Date(a + "T00:00") - new Date(b + "T00:00")) / 864e5);
 
-// Sincronización en tiempo real
-for (const col of ["fechas", "deberes", "libros"]) {
-  onSnapshot(collection(db, col), snap => {
-    data[col] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    render(col);
-  });
-  $("#q-" + col).oninput = () => render(col);
-  $("#f-" + col).onsubmit = async e => {
-    e.preventDefault();
-    const f = Object.fromEntries(new FormData(e.target));
-    await addDoc(collection(db, col), { ...f, creado: serverTimestamp() });
-    e.target.reset();
-  };
-}
-
-function render(col) {
-  const q = $("#q-" + col).value.trim().toLowerCase();
-  let items = data[col].filter(i => nombre(col, i).toLowerCase().includes(q));
-  if (col === "fechas") items.sort((a, b) => a.fecha.localeCompare(b.fecha));
-  else if (col === "deberes") items.sort((a, b) => b.fecha.localeCompare(a.fecha));
-  else items.sort((a, b) => a.titulo.localeCompare(b.titulo, "es"));
-  const hoy = new Date().toISOString().slice(0, 10);
-  $("#l-" + col).innerHTML = items.length ? items.map(i => col === "fechas" ? fila(i, hoy) : col === "deberes" ? deber(i, hoy) : libro(i)).join("")
-    : `<li class="vacio" style="display:block;border-left-width:1px">${q ? "Sin resultados" : "Aún no hay nada. Añade el primero."}</li>`;
-}
-
-function fila(i, hoy) {
-  const d = Math.round((new Date(i.fecha) - new Date(hoy)) / 864e5);
-  const cuando = d < 0 ? "pasado" : d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
-  const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
-  return `<li class="${i.tipo} ${d < 0 ? "pasado" : ""}"><div class="info"><div class="t">${esc(i.titulo)}</div>
-    <div class="m"><span class="tag">${i.tipo === "examen" ? "Examen" : "Trabajo"}</span> · ${fecha} · ${cuando}</div></div>${acciones("fechas", i.id)}</li>`;
-}
-
-const nombre = (col, i) => col === "deberes" ? `${i.asignatura} ${i.tema}` : i.titulo;
-
-function deber(i, hoy) {
-  const d = Math.round((new Date(hoy) - new Date(i.fecha)) / 864e5);
-  const cuando = d <= 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`;
-  const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" });
-  return `<li class="trabajo"><div class="info"><div class="t">${esc(i.asignatura)} · ${esc(i.tema)}</div>
-    <div class="m">Ejercicios: ${esc(i.ejercicios)} · Pág. ${esc(i.pagina)}</div>
-    <div class="m"><span class="tag">Mandado</span> · ${fecha} · ${cuando}</div></div>${acciones("deberes", i.id)}</li>`;
-}
-
-function libro(i) {
-  return `<li class="trabajo"><div class="info"><div class="t">${esc(i.titulo)}</div>
-    <div class="m"><a href="${esc(i.url)}" target="_blank" rel="noopener">Abrir libro</a></div></div>${acciones("libros", i.id)}</li>`;
-}
-
-const acciones = (col, id) => `<div class="acts"><button data-a="edit" data-c="${col}" data-id="${id}">Editar</button><button data-a="del" data-c="${col}" data-id="${id}">Eliminar</button></div>`;
-
-// ---- Horario semanal (se reinicia cada semana) ----
+// ---- Horario ----
+const MATERIAS = ["CEAC", "OACV", "ING", "EYA", "TII", "TC", "IPE I GM", "SASPM", "DASPGM"];
 const HORAS = ["15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00", "18:15 - 19:15", "19:15 - 20:15", "20:15 - 21:15"];
 const HORARIO = [
   ["Lunes",     [["CEAC","Gema Milla Martos"],["CEAC","Gema Milla Martos"],["OACV","Gema Milla Martos"],["ING","Mariano Suárez Rodriguez"],["EYA","Joana Belmonte Jaén"],["TII","Joana Belmonte Jaén"]]],
@@ -210,11 +181,210 @@ const HORARIO = [
 ];
 const ESTADOS = ["Clase", "Examen", "Sin clase"];
 
-function lunesDeEstaSemana() {
-  const d = new Date(); d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+// Horas (índices) en que una asignatura tiene clase un día concreto
+function horasDe(asig, fecha) {
+  if (!asig || !fecha) return [];
+  const di = diaIdx(fecha);
+  if (di > 4) return [];
+  return HORARIO[di][1].map((c, hi) => c[0] === asig ? hi : -1).filter(h => h >= 0);
 }
+
+// Rellena un <select> con las horas posibles. Devuelve cuántas horas hay.
+function fillHora(sel, nota, asig, fecha, actual) {
+  const hs = horasDe(asig, fecha);
+  sel.innerHTML = "";
+  if (!hs.length) {
+    sel.hidden = true; sel.required = false;
+    if (nota) {
+      nota.hidden = !(asig && fecha);
+      nota.textContent = "Ese día no hay clase de " + asig + " en el horario.";
+    }
+    return 0;
+  }
+  const opts = hs.map(h => [HORAS[h], HORAS[h]]);
+  if (hs.length > 1) {
+    const todo = HORAS[hs[0]].split(" - ")[0] + " - " + HORAS[hs[hs.length - 1]].split(" - ")[1];
+    opts.push([todo, "Las dos horas juntas: " + todo]);
+  }
+  if (hs.length > 1) sel.append(new Option("¿A qué hora es el examen?", ""));
+  opts.forEach(([v, l]) => sel.append(new Option(l, v)));
+  if (actual && opts.some(o => o[0] === actual)) sel.value = actual;
+  sel.hidden = false; sel.required = hs.length > 1;
+  if (nota) nota.hidden = true;
+  return hs.length;
+}
+
+// ---- Formulario de exámenes y trabajos ----
+const ff = $("#f-fechas");
+[...MATERIAS, "Otra"].forEach(m => ff.asignatura.append(new Option(m === "Otra" ? "Otra (escribir abajo)" : m, m)));
+$("#fa-deberes").append(...MATERIAS.map(m => new Option(m, m)));
+
+function actualizarFormFechas() {
+  const otra = ff.asignatura.value === "Otra";
+  ff.titulo.required = otra;
+  ff.titulo.placeholder = otra ? "Título de la materia" : "Detalle (ej. Tema 3) — opcional";
+  if (ff.tipo.value !== "examen" || otra) {
+    ff.hora.hidden = true; ff.hora.required = false; $("#fh-nota").hidden = true;
+    return;
+  }
+  fillHora(ff.hora, $("#fh-nota"), ff.asignatura.value, ff.fecha.value, ff.hora.value);
+}
+ff.tipo.onchange = ff.asignatura.onchange = ff.fecha.onchange = actualizarFormFechas;
+actualizarFormFechas();
+
+ff.onsubmit = async e => {
+  e.preventDefault();
+  const asig = ff.asignatura.value, det = ff.titulo.value.trim();
+  const obj = {
+    titulo: asig === "Otra" ? det : asig + (det ? " · " + det : ""),
+    tipo: ff.tipo.value,
+    fecha: ff.fecha.value,
+    asignatura: asig === "Otra" ? "" : asig,
+    hora: ff.tipo.value === "examen" && !ff.hora.hidden ? ff.hora.value : ""
+  };
+  const ref = await addDoc(collection(db, "fechas"), { ...obj, creado: serverTimestamp() });
+  ff.reset(); actualizarFormFechas();
+  if (confirm("Guardado. ¿Añadirlo también a tu calendario?")) descargarICS({ id: ref.id, ...obj });
+};
+
+// ---- Calendario (.ics: lo abre cualquier app de calendario) ----
+function descargarICS(i) {
+  const f = i.fecha.replace(/-/g, ""), t = s => s.replace(":", "") + "00";
+  const txt = s => String(s).replace(/[\\,;]/g, "\\$&");
+  let quando;
+  if (i.hora) {
+    const [a, b] = i.hora.split(" - ");
+    quando = `DTSTART:${f}T${t(a)}\r\nDTEND:${f}T${t(b)}`;
+  } else {
+    const n = new Date(i.fecha + "T00:00"); n.setDate(n.getDate() + 1);
+    quando = `DTSTART;VALUE=DATE:${f}\r\nDTEND;VALUE=DATE:${ymd(n).replace(/-/g, "")}`;
+  }
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Agenda de clase//ES", "BEGIN:VEVENT",
+    `UID:${i.id}@agenda-de-clase`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]|\.\d{3}/g, "")}`,
+    quando,
+    `SUMMARY:${txt((i.tipo === "examen" ? "Examen: " : "Trabajo: ") + i.titulo)}`,
+    "BEGIN:VALARM", "TRIGGER:-P1D", "ACTION:DISPLAY", "DESCRIPTION:Mañana", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR"
+  ].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+  a.download = `${i.tipo}-${i.fecha}.ics`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// Pestañas
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b));
+  for (const t of ["fechas", "horario", "deberes", "libros"]) $("#" + t).hidden = b.dataset.tab !== t;
+});
+
+// Deberes: pendientes / hechos
+let vistaDeb = "pend";
+document.querySelectorAll(".subtab").forEach(b => b.onclick = () => {
+  vistaDeb = b.dataset.sub;
+  document.querySelectorAll(".subtab").forEach(x => x.setAttribute("aria-selected", x === b));
+  $("#f-deberes").hidden = vistaDeb === "hech";
+  $("#filtros-hechos").hidden = vistaDeb !== "hech";
+  render("deberes");
+});
+$("#fa-deberes").onchange = $("#ord-deberes").onchange = () => render("deberes");
+
+// Sincronización en tiempo real
+for (const col of ["fechas", "deberes", "libros"]) {
+  onSnapshot(collection(db, col), snap => {
+    data[col] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    render(col);
+    if (col === "fechas") renderHorario();
+  });
+  $("#q-" + col).oninput = () => render(col);
+  if (col === "fechas") continue;
+  $("#f-" + col).onsubmit = async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    await addDoc(collection(db, col), { ...f, ...(col === "deberes" ? { hecho: false } : {}), creado: serverTimestamp() });
+    e.target.reset();
+  };
+}
+
+const num = p => { const n = parseFloat(String(p).replace(",", ".")); return isNaN(n) ? Infinity : n; };
+
+function render(col) {
+  const q = $("#q-" + col).value.trim().toLowerCase();
+  let items = data[col].filter(i => nombre(col, i).toLowerCase().includes(q));
+  const hoy = ymd(new Date());
+  let vacioMsg = q ? "Sin resultados" : "Aún no hay nada. Añade el primero.";
+
+  if (col === "fechas") items.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  else if (col === "deberes") {
+    $("#n-pend").textContent = data.deberes.filter(i => !i.hecho).length;
+    $("#n-hech").textContent = data.deberes.filter(i => i.hecho).length;
+    const hech = vistaDeb === "hech";
+    items = items.filter(i => !!i.hecho === hech);
+    if (hech) {
+      const fa = $("#fa-deberes").value;
+      if (fa) items = items.filter(i => i.asignatura === fa);
+      if ($("#ord-deberes").value === "pagina") items.sort((a, b) => num(a.pagina) - num(b.pagina) || a.asignatura.localeCompare(b.asignatura));
+      else items.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      if (!q) vacioMsg = "Todavía no hay deberes hechos" + (fa ? " de " + fa : "") + ".";
+    } else {
+      items.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      if (!q) vacioMsg = "No tienes deberes pendientes. 🎉";
+    }
+  } else items.sort((a, b) => a.titulo.localeCompare(b.titulo, "es"));
+
+  let html;
+  if (!items.length) html = `<li class="vacio" style="display:block;border-left-width:1px">${vacioMsg}</li>`;
+  else if (col === "fechas") {
+    const exSem = {};
+    items.forEach(i => { if (i.tipo === "examen") { const k = lunesDe(i.fecha); exSem[k] = (exSem[k] || 0) + 1; } });
+    let prev = "";
+    html = items.map(i => {
+      const k = lunesDe(i.fecha); let h = "";
+      if (k !== prev) {
+        prev = k;
+        const ex = exSem[k];
+        const txt = new Date(k + "T00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" });
+        h = `<li class="semh${ex ? " semex" : ""}">Semana del ${txt}${ex ? " · 📝 Semana de exámenes" : ""}</li>`;
+      }
+      return h + fila(i, hoy);
+    }).join("");
+  } else html = items.map(i => col === "deberes" ? deber(i, hoy) : libro(i)).join("");
+  $("#l-" + col).innerHTML = html;
+}
+
+function fila(i, hoy) {
+  const d = diasHasta(i.fecha, hoy);
+  const cuando = d < 0 ? "pasado" : d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
+  const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  return `<li class="${i.tipo} ${d < 0 ? "pasado" : ""}"><div class="info"><div class="t">${esc(i.titulo)}</div>
+    <div class="m"><span class="tag">${i.tipo === "examen" ? "Examen" : "Trabajo"}</span> · ${fecha}${i.hora ? " · " + esc(i.hora) : ""} · ${cuando}</div></div>${acciones("fechas", i.id, `<button data-a="cal" data-c="fechas" data-id="${i.id}">📅 Calendario</button>`)}</li>`;
+}
+
+const nombre = (col, i) => col === "deberes" ? `${i.asignatura} ${i.tema}` : i.titulo;
+
+function deber(i, hoy) {
+  const d = diasHasta(hoy, i.fecha);
+  const cuando = d <= 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`;
+  const fecha = new Date(i.fecha + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" });
+  const extra = i.hecho
+    ? `<button data-a="undo" data-c="deberes" data-id="${i.id}">↩ Pendiente</button>`
+    : `<button class="ok" data-a="done" data-c="deberes" data-id="${i.id}">✓ Hecho</button>`;
+  return `<li class="trabajo${i.hecho ? " pasado" : ""}"><div class="info"><div class="t">${i.hecho ? "✅ " : ""}${esc(i.asignatura)} · ${esc(i.tema)}</div>
+    <div class="m">Ejercicios: ${esc(i.ejercicios)} · Pág. ${esc(i.pagina)}</div>
+    <div class="m"><span class="tag">Mandado</span> · ${fecha} · ${cuando}</div></div>${acciones("deberes", i.id, extra)}</li>`;
+}
+
+function libro(i) {
+  return `<li class="trabajo"><div class="info"><div class="t">${esc(i.titulo)}</div>
+    <div class="m"><a href="${esc(i.url)}" target="_blank" rel="noopener">Abrir libro</a></div></div>${acciones("libros", i.id)}</li>`;
+}
+
+const acciones = (col, id, extra = "") => `<div class="acts">${extra}<button data-a="edit" data-c="${col}" data-id="${id}">Editar</button><button data-a="del" data-c="${col}" data-id="${id}">Eliminar</button></div>`;
+
+// ---- Horario semanal (se reinicia cada semana) ----
 let semana = lunesDeEstaSemana();
 const lsKey = () => "horario-" + semana;
 let estados = {};
@@ -222,13 +392,23 @@ try { estados = JSON.parse(localStorage.getItem(lsKey()) || "{}"); } catch {}
 
 function renderHorario() {
   const hoyIdx = (new Date().getDay() + 6) % 7;
-  $("#semana").textContent = "Semana del " + new Date(semana + "T00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" });
-  $("#l-horario").innerHTML = HORARIO.map(([dia, clases], di) =>
-    `<h2 class="dia ${di === hoyIdx ? "hoy" : ""}">${dia}${di === hoyIdx ? " (hoy)" : ""}</h2>` +
+  const esHoySemana = semana === lunesDeEstaSemana();
+  const hayExamen = data.fechas.some(x => x.tipo === "examen" && lunesDe(x.fecha) === semana);
+  const s = $("#semana");
+  s.textContent = "Semana del " + new Date(semana + "T00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" }) + (hayExamen ? " · 📝 Semana de exámenes" : "");
+  s.classList.toggle("conex", hayExamen);
+  const base = new Date(semana + "T00:00");
+  $("#l-horario").innerHTML = HORARIO.map(([dia, clases], di) => {
+    const dd = new Date(base); dd.setDate(base.getDate() + di);
+    const fd = ymd(dd);
+    const exs = data.fechas.filter(x => x.tipo === "examen" && x.fecha === fd);
+    const hoy = esHoySemana && di === hoyIdx;
+    return `<h2 class="dia ${hoy ? "hoy" : ""}">${dia} ${dd.getDate()}${hoy ? " (hoy)" : ""}${exs.map(x => `<span class="badge">📝 ${esc(x.titulo)}${x.hora ? " · " + esc(x.hora) : ""}</span>`).join("")}</h2>` +
     clases.map(([mat, prof], hi) => {
       const id = di + "-" + hi, e = estados[id] || 0;
       return `<button class="hora e${e}" data-h="${id}"><span><b>${HORAS[hi]}</b><br>${esc(mat)}<small>${esc(prof)}</small></span><span class="est">${ESTADOS[e]}</span></button>`;
-    }).join("")).join("");
+    }).join("");
+  }).join("");
 }
 
 $("#l-horario").onclick = async ev => {
@@ -255,11 +435,15 @@ setInterval(() => {
   if (semana !== lunesDeEstaSemana()) { semana = lunesDeEstaSemana(); estados = {}; escucharSemana(); renderHorario(); }
 }, 60000);
 
-// Editar / eliminar
+// Acciones: hecho, calendario, editar, eliminar
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-a]"); if (!b) return;
   const { a, c, id } = b.dataset;
   const item = data[c].find(x => x.id === id);
+  if (!item) return;
+  if (a === "done") { await updateDoc(doc(db, c, id), { hecho: true, hechoEn: serverTimestamp() }); return; }
+  if (a === "undo") { await updateDoc(doc(db, c, id), { hecho: false }); return; }
+  if (a === "cal") { descargarICS(item); return; }
   if (a === "del") {
     if (confirm(`¿Eliminar "${nombre(c, item)}"?`)) await deleteDoc(doc(db, c, id));
     return;
@@ -272,12 +456,18 @@ document.addEventListener("click", async e => {
   f.url.hidden = !esLib; f.url.required = esLib;
   f.asignatura.hidden = f.tema.hidden = f.ejercicios.hidden = f.pagina.hidden = !esDeb;
   f.tema.required = f.ejercicios.required = f.pagina.required = esDeb;
+  f.hora.hidden = true; f.hora.required = false;
+  const rehora = () => {
+    if (esFecha && item.asignatura && f.tipo.value === "examen") fillHora(f.hora, null, item.asignatura, f.fecha.value, item.hora);
+    else { f.hora.hidden = true; f.hora.required = false; }
+  };
+  f.fecha.onchange = f.tipo.onchange = rehora;
   if (esDeb) {
     f.asignatura.value = item.asignatura; f.tema.value = item.tema;
     f.ejercicios.value = item.ejercicios; f.pagina.value = item.pagina; f.fecha.value = item.fecha;
   } else {
     f.titulo.value = item.titulo;
-    if (esFecha) { f.tipo.value = item.tipo; f.fecha.value = item.fecha; } else f.url.value = item.url;
+    if (esFecha) { f.tipo.value = item.tipo; f.fecha.value = item.fecha; rehora(); } else f.url.value = item.url;
   }
   $("#dlg").returnValue = "";
   $("#dlg").showModal();
@@ -285,7 +475,7 @@ document.addEventListener("click", async e => {
     if ($("#dlg").returnValue !== "ok") return;
     let n;
     if (esDeb) n = { asignatura: f.asignatura.value, tema: f.tema.value, ejercicios: f.ejercicios.value, pagina: f.pagina.value, fecha: f.fecha.value };
-    else if (esFecha) n = { titulo: f.titulo.value, tipo: f.tipo.value, fecha: f.fecha.value };
+    else if (esFecha) n = { titulo: f.titulo.value, tipo: f.tipo.value, fecha: f.fecha.value, hora: f.tipo.value === "examen" && !f.hora.hidden ? f.hora.value : "" };
     else n = { titulo: f.titulo.value, url: f.url.value };
     await updateDoc(doc(db, c, id), n);
   };

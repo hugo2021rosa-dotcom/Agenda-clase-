@@ -35,4 +35,3 @@ git push -u origin main
 Luego en GitHub: **Settings > Pages > Deploy from branch > main / root**. Comparte el enlace con tus tres compañeros.
 
 > Prueba en local con un servidor (por ejemplo `python3 -m http.server`), no abriendo el archivo directamente, porque usa módulos ES.
-https://hugo2021rosa-dotcom.github.io/Agenda-clase-/
